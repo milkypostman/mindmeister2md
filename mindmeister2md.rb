@@ -191,7 +191,7 @@ else
     id = p.elements["id"].text
     title = p.elements["title"].text
     link = p.elements["link"].text unless p.elements["link"].text.nil?
-    note = p.elements["note"].text.strip_html(['a']).gsub(/ style="[^"]*?"/,'') unless p.elements["note"].text.nil?
+    note = p.elements["note"].text.strip_html(['a']) unless p.elements["note"].text.nil?
     i = Idea.new(id, title, link, note)
     parent = p.elements["parent"].text
     if parent.nil?
@@ -206,8 +206,8 @@ else
   def print_level (node, level)
     title = node.title
     title = node.link.nil? ? title : "[#{title}](#{node.link})"
-    title = (node.note.nil? || level == 0) ? title : "#{title}\n\n    #{node.note}\n\n"
-    title.gsub!(/\\r?/,'')
+    title = (node.note.nil? || spaces == 0) ? title : "#{title}\n\n    #{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
+    title = title.gsub(/\\r?/,'').gsub(/\s?style="[^"]*?"/,'').gsub(/([#*])/,'\\\\\1')
     if level < $list_level
       print "#" * (level+1)
       puts " #{title}\n\n"
@@ -223,8 +223,6 @@ else
     end
   end
 
-
   print_level(root, 0)
 
 end
-
