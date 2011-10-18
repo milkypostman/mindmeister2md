@@ -36,18 +36,39 @@ def api_sig (param, secret)
              Digest::MD5.hexdigest(secret + param.sort.join))
 end
 
+class String
+  # Removes HTML tags from a string. Allows you to specify some tags to be kept.
+  def strip_html( allowed = [] )    
+    re = if allowed.any?
+      Regexp.new(
+        %(<(?!(\\s|\\/)*(#{
+          allowed.map {|tag| Regexp.escape( tag )}.join( "|" )
+        })( |>|\\/|'|"|<|\\s*\\z))[^>]*(>+|\\s*\\z)),
+        Regexp::IGNORECASE | Regexp::MULTILINE
+      )
+    else
+      /<[^>]*(>+|\s*\z)/m
+    end
+    gsub(re,'')
+  end
+end
+
 class Idea
-  attr_accessor :key, :title, :children
+  attr_accessor :key, :title, :link, :note, :children
 
   def initialize
     @key = nil
     @title = nil
+    @note = nil
+    @link = nil
     @children = []
   end
 
-  def initialize(key, title)
+  def initialize(key, title, link, note)
     @key = key
     @title = title
+    @link = link
+    @note = note
     @children = []
   end
 end
@@ -88,7 +109,7 @@ if !File.exists? $config_file
   puts
   puts "You can apply for an API key here: https://www.mindmeister.com/account/api/"
   puts
-  Process.exit -1
+  Process.exit(-1)
 end
 
 # load our configuration file
@@ -108,13 +129,13 @@ if !config.key? "api_key" or !config.key? "secret"
     config["secret"] = ""
   end
   dump_config( config )
-  Process.exit -1
+  Process.exit(-1)
 end
 
 # assert that api_key and secret have values
 if config["api_key"] == "" or config["secret"] == ""
   puts "api_key or secret are missing.  Please update #{$config_file}."
-  Process.exit -1
+  Process.exit(-1)
 end
 
 param = {"api_key" => config["api_key"]}
@@ -155,7 +176,9 @@ else
   doc.elements.each("rsp/ideas/idea") do |p|
     id = p.elements["id"].text
     title = p.elements["title"].text
-    i = Idea.new(id, title)
+    link = p.elements["link"].text unless p.elements["link"].text.nil?
+    note = p.elements["note"].text.strip_html(['a']).gsub(/ style="[^"]*?"/,'') unless p.elements["note"].text.nil?
+    i = Idea.new(id, title, link, note)
     parent = p.elements["parent"].text
     if parent.nil?
       root = i
@@ -167,16 +190,24 @@ else
   end
 
   def print_level ( node, spaces)
-    puts "#{spaces}* #{node.title}"
+    title = node.title
+    title = node.link.nil? ? title : "[#{title}](#{node.link})"
+    title = (node.note.nil? || spaces == 0) ? title : "#{title}\n\n    #{node.note}\n\n"
+    title.gsub!(/\\([^\\])/,"\\1")
+    if spaces == 0
+      puts "# #{title}\n"
+    elsif spaces == 1
+      puts "\n## #{title}\n\n"
+    else
+      ((spaces-2)*2).times {print " "}
+      puts "* #{title}"
+    end
     node.children.each { |n|
-      print_level(n, spaces + "    ")
+      print_level(n, spaces + 1)
     }
   end
 
 
-  print_level(root, "")
+  print_level(root, 0)
 
 end
-
-
-
