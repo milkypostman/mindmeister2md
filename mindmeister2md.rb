@@ -146,6 +146,20 @@ if !config.key? "auth"
   dump_config( config )
 end
 
+if !config.key? "indent"
+  config["indent"] = 2
+  dump_config( config )
+end
+
+$indent = config["indent"]
+
+if !config.key? "list_level"
+  config["list_level"] = 2
+  dump_config( config )
+end
+
+$list_level = config["list_level"]
+
 auth = config["auth"]
 param.update({"auth_token" => auth["token"]})
 
@@ -189,22 +203,24 @@ else
     d[id] = i
   end
 
-  def print_level ( node, spaces)
+  def print_level (node, level)
     title = node.title
     title = node.link.nil? ? title : "[#{title}](#{node.link})"
-    title = (node.note.nil? || spaces == 0) ? title : "#{title}\n\n    #{node.note}\n\n"
+    title = (node.note.nil? || level == 0) ? title : "#{title}\n\n    #{node.note}\n\n"
     title.gsub!(/\\r?/,'')
-    if spaces == 0
-      puts "# #{title}\n"
-    elsif spaces == 1
-      puts "\n## #{title}\n\n"
+    if level < $list_level
+      print "#" * (level+1)
+      puts " #{title}\n\n"
     else
-      ((spaces-2)*2).times {print " "}
+      print " " * ((level-$list_level)*$indent)
       puts "* #{title}"
     end
     node.children.each { |n|
-      print_level(n, spaces + 1)
+      print_level(n, level + 1)
     }
+    if level <= $list_level-1
+      print level == $list_level - 1 ? "\n\n" : "\n"
+    end
   end
 
 
