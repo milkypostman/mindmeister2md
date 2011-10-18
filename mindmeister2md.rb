@@ -1,213 +1,139 @@
-#!/usr/bin/env ruby
+# Tagging
 
-require 'digest/md5'
-require 'uri'
-require 'net/http'
-require 'yaml'
-require 'rexml/document'
+## tagging vs folders
 
-$host = "www.mindmeister.com"
+* folders
+  * static
+  * unintuitive
+  * hierarchical groupings
+  * has to be date-based, project-based, media-type based, etc.
+* tagging
+  * group things every way that makes sense
+  * search is more flexible
+  * additional possibilities
+    * Hazel actions
+    * super tags
+      * target tags
+    * Scripting
 
-$config_file = File.expand_path("~/.mindmeister2md")
+## The combo system
 
-def load_config
-  File.open($config_file) { |yf| YAML::load(yf) }
-end
+* I file tagged files in folders
+  * limited-level folder hierarchy
+    * Work
+      * client
+      * client
+    * Code
+      * project
+      * project
+* tags can exist within folders just fine
+* Folders provide visual and mental organization
+* One Big Pile is a misnomer
+  * Nobody does that, do they?
+  * Smaller &quot;Piles&quot; are for general topics
+    * Similar to Evernote Notebooks
+    * Inspirational references go in a pile
+    * TUAW post drafts go in a pile
+    * Brettterpstra.com post drafts go in a pile
+    * Piles are searched and filtered with text content and tags
 
-def dump_config (config)
-  File.open($config_file, 'w') { |yf| YAML::dump(config, yf) }
-end
+## Intelligent tagging
 
-def rest_call(param)
-  url = URI::HTTP.build({:host => $host, :path => "/services/rest", :query => param})
-  Net::HTTP.get_response(url).body
-end  
+* minimal number of tags
+  * tags get unmanageable in a large group
+  * use &quot;real&quot; words
+    * Project or topic
+    * the first word that comes to mind
+      * probably what you'll use to find it again in the future
+    * a logical secondary topic or project name
+  * think like folders
+    * but multiple instead of hierarchical
+  * skip &quot;flagged&quot; tags
+    * &quot;interesting&quot;, &quot;due&quot;, &quot;urgent&quot;, etc.
+    * Too much review
+      * Un-reviewed &quot;flags&quot; become irrelevant rapidly
+    * ineffective to prioritize in tagging's non-linear fashion.
+    * exception for &quot;inspiration&quot;
+      * subtags
+        * Webdesign
+        * Productivity
+        * Color
+  * skip existing metadata
+    * created/modified date
+    * Spotlight notes
+    * keywords existing within searchable content
+    * Filename
+    * Filetype
+* Reuse tags consistently
+  * &quot;blogpost&quot; and &quot;blogposts&quot; aren't grouped effectively
+  * Reference similar files to replicate tags
+  * doesn't take any longer than filing in folders would
+  * Most apps provide auto-completion and recent/common tags
+  * Make a cheat sheet
+    * Keep a Notational Velocity note with tags you might forget
+    * Paper is an option, of course
+    * Especially track special conventions
+* special conventions
+  * Tag prefixes
+    * source:, project:, etc.
+    * special character prefixes
+      * helpful for creating &quot;supertags&quot; used in creating extra functionality
+  * benefits
+    * make some part of the tag memorable in case you forget the rest
+    * can group tags anywhere
+      * type the first character and get all the subgroups
+    * sort to the top in most tag lists
 
-def join_param (param)
-  URI.escape(
-  param.sort.map { |key, val|
-    "#{key}=#{val}"
-  }.join("&"))
-end
+## interoperability
 
-def api_sig (param, secret)
-  URI.escape(join_param(param) + 
-             "&api_sig=" + 
-             Digest::MD5.hexdigest(secret + param.sort.join))
-end
+* Tagging system is only as good as the search system
+* Spotlight and OpenMeta combine all supported apps in one search
+  * Apps can use proprietary tagging systems, as long as they write OpenMeta tags to disk for Spotlight
+    * Thanks to Tags and the OpenMeta project, it's possible to shell and AppleScript the process for many unsupported apps
+* support from devs
+  * Spotlight/Finder
+    * a &quot;tag:&quot; prefix searches tags
+    * can be combined with other Spotlight queries
+    * Save searches as Finder Smart Folders
+  * Tags
+    * Hotkey HUD for adding OpenMeta tags
+    * The fastest way to tag *anything*
+      * Mail.app emails
+      * iCal events
+      * iPhoto photos
+      * Finder files
+      * Current document in most apps
+      * Web locations
+    * Tag/Spotlight search in menubar with drilldown
+  * Notational Velocity
+    * Latest version copies note tags to OpenMeta tags on filesystem files
+  * Together
+    * Reads and writes OpenMeta tags from disk
+  * DEVONthink
+    * Includes tags as OpenMeta on exported files
+  * EagleFiler
+    * Reads and writes OpenMeta tags to disk
+  * Leap
+    * A Finder replacement built on OpenMeta tagging
+  * Yep
+    * PDF filing, essentially a lightweight Leap
+  * Deep
+    * Search images by color, size and tag, add tags quickly
+  * Default Folder X
+    * Allows tagging when saving files
+  * HoudahSpot
+    * Enhanced Spotlight search, including tags and keywords
+    * Also includes slide-out drawer with drag and drop tagging
+  * Evernote
+    * Not OpenMeta, but add a &quot;keyword&quot; predicate to Spotlight search and they'll mix
 
-class String
-  # Removes HTML tags from a string. Allows you to specify some tags to be kept.
-  def strip_html( allowed = [] )    
-    re = if allowed.any?
-      Regexp.new(
-        %(<(?!(\\s|\\/)*(#{
-          allowed.map {|tag| Regexp.escape( tag )}.join( "|" )
-        })( |>|\\/|'|"|<|\\s*\\z))[^>]*(>+|\\s*\\z)),
-        Regexp::IGNORECASE | Regexp::MULTILINE
-      )
-    else
-      /<[^>]*(>+|\s*\z)/m
-    end
-    gsub(re,'')
-  end
-end
+## Additional notes
 
-class Idea
-  attr_accessor :key, :title, :link, :note, :children
-
-  def initialize
-    @key = nil
-    @title = nil
-    @note = nil
-    @link = nil
-    @children = []
-  end
-
-  def initialize(key, title, link, note)
-    @key = key
-    @title = title
-    @link = link
-    @note = note
-    @children = []
-  end
-end
-
-def authenticate (api_key, secret)
-  # first we have to get the frob
-  froparam = {"api_key" => api_key, "method" => "mm.auth.getFrob"}
-  frobbody = rest_call(api_sig(froparam, secret))
-  frob = REXML::Document.new(frobbody).elements["rsp/frob"].text
-
-  # next the user has to authenticate this API key
-  authparam = {"api_key" => api_key, "perms" => "read", "frob" => frob}
-  authurl = URI::HTTP.build({:host => $host, :path => "/services/auth", :query => api_sig(authparam, secret)})
-  puts "Opening Safari for authentication."
-  `open -a Safari "#{authurl.to_s}"`
-  puts "Press ENTER after you have successfully authenticated."
-  gets
-
-  # now we actually get the auth data
-  authparam = {"api_key" => api_key, "method" => "mm.auth.getToken", "frob" => frob}
-  authbody = rest_call(api_sig(authparam, secret))
-
-  auth = REXML::Document.new(authbody).elements["rsp/auth"]
-
-  {
-    "token" => auth.elements["token"].text,
-    "username" => auth.elements["user"].attributes["username"],
-    "userid" => auth.elements["user"].attributes["id"],
-    "fullname" => auth.elements["user"].attributes["fullname"],
-    "email" => auth.elements["user"].attributes["email"],
-  }
-end
-
-# if the configuration file doesn't exist, create it with default values
-if !File.exists? $config_file
-  dump_config( {"api_key" => "", "secret" => ""} )
-  puts "You need to update the configuration file #{$config_file}."
-  puts
-  puts "You can apply for an API key here: https://www.mindmeister.com/account/api/"
-  puts
-  Process.exit(-1)
-end
-
-# load our configuration file
-config = load_config
-
-# assert we have api_key and secret
-if !config.key? "api_key" or !config.key? "secret"
-  puts "ERROR: api_key or secret not in configuration file!"
-  puts "Adding keys to configuration; please update accordingly."
-  puts
-  puts "You can apply for an API key here: https://www.mindmeister.com/account/api/"
-  puts
-  if !config.key? "api_key"
-    config["api_key"] = ""
-  end
-  if !config.key? "secret"
-    config["secret"] = ""
-  end
-  dump_config( config )
-  Process.exit(-1)
-end
-
-# assert that api_key and secret have values
-if config["api_key"] == "" or config["secret"] == ""
-  puts "api_key or secret are missing.  Please update #{$config_file}."
-  Process.exit(-1)
-end
-
-param = {"api_key" => config["api_key"]}
-secret = config["secret"]
-
-if !config.key? "auth"
-  config["auth"] = authenticate(config["api_key"], secret)
-  dump_config( config )
-end
-
-auth = config["auth"]
-param.update({"auth_token" => auth["token"]})
-
-if ARGV.empty?
-  puts "Listing MindMeister Maps"
-  puts "---"
-
-  listparam = param.merge({"method" => "mm.maps.getList"})
-  listbody = rest_call(api_sig(listparam, secret))
-
-  # puts listbody
-
-  REXML::Document.new(listbody).elements.each("rsp/maps/map") { |e|
-    mid = e.attributes["id"]
-    mtitle = e.attributes["title"]
-    puts "#{mid} : #{mtitle}"
-  }
-
-else
-  d = Hash.new()
-
-  mapparam = param.merge({"method" => "mm.maps.getMap", "map_id" => ARGV[0]})
-  mapbody = rest_call(api_sig(mapparam, secret))
-
-  root = nil
-
-  doc, posts = REXML::Document.new(mapbody)
-  doc.elements.each("rsp/ideas/idea") do |p|
-    id = p.elements["id"].text
-    title = p.elements["title"].text
-    link = p.elements["link"].text unless p.elements["link"].text.nil?
-    note = p.elements["note"].text.strip_html(['a']).gsub(/ style="[^"]*?"/,'') unless p.elements["note"].text.nil?
-    i = Idea.new(id, title, link, note)
-    parent = p.elements["parent"].text
-    if parent.nil?
-      root = i
-    else
-      d[parent].children << i
-    end
-
-    d[id] = i
-  end
-
-  def print_level ( node, spaces)
-    title = node.title
-    title = node.link.nil? ? title : "[#{title}](#{node.link})"
-    title = (node.note.nil? || spaces == 0) ? title : "#{title}\n\n    #{node.note}\n\n"
-    title.gsub!(/\\([^\\])/,"\\1")
-    if spaces == 0
-      puts "# #{title}\n"
-    elsif spaces == 1
-      puts "\n## #{title}\n\n"
-    else
-      ((spaces-2)*2).times {print " "}
-      puts "* #{title}"
-    end
-    node.children.each { |n|
-      print_level(n, spaces + 1)
-    }
-  end
-
-
-  print_level(root, 0)
-
-end
+* OpenMeta may not be future-proof
+  * legitimate concern
+  * data is backed up
+  * Snow Leopard already broke it once, but it was immediately worked around
+* Mac App Store rejection because of OpenMeta
+  * Universal tag backup system breaks the rules
+  * Each app has to be sandboxed
+  * Still workable, but inconvenient and redundant
