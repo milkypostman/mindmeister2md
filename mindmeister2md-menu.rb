@@ -6,6 +6,11 @@ require 'net/http'
 require 'yaml'
 require 'rexml/document'
 
+if ARGV[0].nil?
+  puts "You need to specify an output filename/path"
+  exit
+end
+
 $host = "www.mindmeister.com"
 
 $config_file = File.expand_path("~/.mindmeister2md")
