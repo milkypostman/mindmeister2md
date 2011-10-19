@@ -3,6 +3,7 @@
 require 'digest/md5'
 require 'uri'
 require 'net/http'
+require 'net/https'
 require 'yaml'
 require 'rexml/document'
 require 'optparse'
@@ -82,8 +83,10 @@ def authenticate (api_key, secret)
 
   # next the user has to authenticate this API key
   authparam = {"api_key" => api_key, "perms" => "read", "frob" => frob}
-  authurl = URI::HTTP.build({:host => $host, :path => "/services/auth", :query => api_sig(authparam, secret)})
+  authurl = URI::HTTPS.build({:host => $host, :path => "/services/auth", :query => api_sig(authparam, secret)})
   puts "Opening Safari for authentication."
+  puts authurl
+
   `open -a Safari "#{authurl.to_s}"`
   puts "Press ENTER after you have successfully authenticated."
   gets
@@ -180,66 +183,80 @@ end
 optparse.parse!
 
 if ARGV.empty?
-  puts "Listing MindMeister Maps"
-  puts "---"
+  STDERR.puts "Available MindMeister Maps"
+  STDERR.puts "---"
 
   listparam = param.merge({"method" => "mm.maps.getList"})
   listbody = rest_call(api_sig(listparam, secret))
 
   # puts listbody
+  menu = []
+  idx = 1
 
   REXML::Document.new(listbody).elements.each("rsp/maps/map") { |e|
     mid = e.attributes["id"]
     mtitle = e.attributes["title"]
-    puts "#{mid} : #{mtitle}"
+    STDERR.puts "#{idx}: #{mtitle}    [ #{mid} ]"
+    menu << mid
+    idx += 1
   }
 
+  sel = 0
+  
+  while !sel =~ /^\d+$/ || sel.to_i <= 0 || sel.to_i > menu.length
+    STDERR.print "Selection: "
+    sel = STDIN.gets
+  end
+
+  map_id = menu[sel.to_i - 1]
 else
-  d = Hash.new()
-
-  mapparam = param.merge({"method" => "mm.maps.getMap", "map_id" => ARGV[0]})
-  mapbody = rest_call(api_sig(mapparam, secret))
-
-  root = nil
-
-  doc, posts = REXML::Document.new(mapbody)
-  doc.elements.each("rsp/ideas/idea") do |p|
-    id = p.elements["id"].text
-    title = p.elements["title"].text
-    link = p.elements["link"].text unless p.elements["link"].text.nil?
-    note = p.elements["note"].text.strip_html(['a']) unless p.elements["note"].text.nil?
-    i = Idea.new(id, title, link, note)
-    parent = p.elements["parent"].text
-    if parent.nil?
-      root = i
-    else
-      d[parent].children << i
-    end
-
-    d[id] = i
-  end
-
-  def print_level (node, level=0, io=STDOUT)
-    title = node.title
-    title = node.link.nil? ? title : "[#{title}](#{node.link})"
-    title = (node.note.nil? || spaces == 0) ? title : "#{title}\n\n    #{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
-    title = title.gsub(/\\r?/,'').gsub(/\s?style="[^"]*?"/,'').gsub(/([#*])/,'\\\\\1')
-    if level < $list_level
-      io.print "#" * (level+1)
-      io.puts " #{title}\n\n"
-    else
-      io.print " " * ((level-$list_level)*$indent)
-      io.puts "* #{title}"
-    end
-    node.children.each { |n|
-      print_level(n, level + 1, io)
-    }
-    if level <= $list_level-1
-      io.print level == $list_level - 1 ? "\n\n" : "\n"
-    end
-  end
-
-  io = options[:outfile].nil? ? STDOUT : File.open(options[:outfile], 'w')
-  print_level(root, 0, io)
-
+  map_id = ARGV[0]
 end
+
+d = Hash.new()
+
+mapparam = param.merge({"method" => "mm.maps.getMap", "map_id" => map_id})
+mapbody = rest_call(api_sig(mapparam, secret))
+
+root = nil
+
+doc, posts = REXML::Document.new(mapbody)
+doc.elements.each("rsp/ideas/idea") do |p|
+  id = p.elements["id"].text
+  title = p.elements["title"].text
+  link = p.elements["link"].text unless p.elements["link"].text.nil?
+  note = p.elements["note"].text.strip_html(['a']) unless p.elements["note"].text.nil?
+  i = Idea.new(id, title, link, note)
+  parent = p.elements["parent"].text
+  if parent.nil?
+    root = i
+  else
+    d[parent].children << i
+  end
+
+  d[id] = i
+end
+
+def print_level (node, level=0, io=STDOUT)
+  title = node.title
+  title = node.link.nil? ? title : "[#{title}](#{node.link})"
+  title = (node.note.nil? || spaces == 0) ? title : "#{title}\n\n    #{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
+  title = title.gsub(/\\r?/,'').gsub(/\s?style="[^"]*?"/,'').gsub(/([#*])/,'\\\\\1')
+  if level < $list_level
+    io.print "#" * (level+1)
+    io.puts " #{title}\n\n"
+  else
+    io.print " " * ((level-$list_level)*$indent)
+    io.puts "* #{title}"
+  end
+  node.children.each { |n|
+    print_level(n, level + 1, io)
+  }
+  if level <= $list_level-1
+    io.print level == $list_level - 1 ? "\n\n" : "\n"
+  end
+end
+
+io = options[:outfile].nil? ? STDOUT : File.open(options[:outfile], 'w')
+print_level(root, 0, io)
+
