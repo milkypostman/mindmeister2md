@@ -67,7 +67,7 @@ class String
         %(<(?!(\\s|\\/)*(#{
           allowed.map {|tag| Regexp.escape( tag )}.join( "|" )
         })( |>|\\/|'|"|<|\\s*\\z))[^>]*(>+|\\s*\\z)),
-        Regexp::IGNORECASE | Regexp::MULTILI
+        Regexp::IGNORECASE | Regexp::MULTILINE
       )
     else
       /<[^>]*(>+|\s*\z)/m
@@ -306,7 +306,7 @@ end
 def print_level (node, level=0, io=STDOUT)
   title = node.title
   title = node.link.nil? ? title : "[#{title}](#{node.link})"
-  title = (node.note.nil? || spaces == 0) ? title : "#{title}\n\n    #{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
+  title = (node.note.nil?) ? title : "#{title}\n\n    #{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
   title = node.image.nil? ? title : "#{title}\n\n![](#{node.image})\n\n"
   title = title.gsub(/\\r/,' ').gsub(/\\'/,"'").gsub(/\s?style="[^"]*?"/,'').gsub(/([#*])/,'\\\\\1')
   if level < $list_level
