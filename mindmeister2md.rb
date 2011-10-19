@@ -77,21 +77,23 @@ class String
 end
 
 class Idea
-  attr_accessor :key, :title, :link, :note, :children
+  attr_accessor :key, :title, :link, :note, :image, :children
 
   def initialize
     @key = nil
     @title = nil
     @note = nil
     @link = nil
+    @image = nil
     @children = []
   end
 
-  def initialize(key, title, link, note)
+  def initialize(key, title, link, note, image)
     @key = key
     @title = title
     @link = link
     @note = note
+    @image = image
     @children = []
   end
 end
@@ -287,7 +289,10 @@ doc.elements.each("rsp/ideas/idea") do |p|
   title = p.elements["title"].text
   link = p.elements["link"].text unless p.elements["link"].text.nil?
   note = p.elements["note"].text.strip_html(['a']) unless p.elements["note"].text.nil?
-  i = Idea.new(id, title, link, note)
+  unless p.elements["image"].elements["url"].nil?
+    image = p.elements["image"].elements["url"].text unless p.elements["image"].elements["url"].text.nil?
+  end
+  i = Idea.new(id, title, link, note, image)
   parent = p.elements["parent"].text
   if parent.nil?
     root = i
@@ -302,7 +307,8 @@ def print_level (node, level=0, io=STDOUT)
   title = node.title
   title = node.link.nil? ? title : "[#{title}](#{node.link})"
   title = (node.note.nil? || spaces == 0) ? title : "#{title}\n\n    #{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
-  title = title.gsub(/\\r?/,'').gsub(/\s?style="[^"]*?"/,'').gsub(/([#*])/,'\\\\\1')
+  title = node.image.nil? ? title : "#{title}\n\n![](#{node.image})\n\n"
+  title = title.gsub(/\\r/,' ').gsub(/\\'/,"'").gsub(/\s?style="[^"]*?"/,'').gsub(/([#*])/,'\\\\\1')
   if level < $list_level
     io.print "#" * (level+1)
     io.puts " #{title}\n\n"
