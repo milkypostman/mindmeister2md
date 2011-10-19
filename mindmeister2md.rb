@@ -119,7 +119,7 @@ if !File.exists? $config_file
   STDERR.puts
   STDERR.puts "You can apply for an API key here: https://www.mindmeister.com/account/api/"
   STDERR.puts
-  Process.exit(-1)
+  exit 1
 end
 
 # load our configuration file
@@ -139,13 +139,13 @@ if !config.key? "api_key" or !config.key? "secret"
     config["secret"] = ""
   end
   dump_config( config )
-  Process.exit(-1)
+  exit 1
 end
 
 # assert that api_key and secret have values
 if config["api_key"] == "" or config["secret"] == ""
   STDERR.puts "api_key or secret are missing.  Please update #{$config_file}."
-  Process.exit(-1)
+  exit 1
 end
 
 param = {"api_key" => config["api_key"]}
@@ -185,32 +185,53 @@ optparse = OptionParser.new do |opts|
   opts.on("-o", "--output FILE", "Write output to FILE") do |file|
     options[:outfile] = file
   end
+  opts.on("-l", "--list", "List Maps and Exit") do
+    options[:list] = true
+  end
    opts.on( '-h', '--help', 'Display this screen' ) do
      puts opts
-     exit
+     exit 1
    end
 end
 
 optparse.parse!
 
+menu = []
+mapbyid = {}
+mapbyname = {}
+
+listparam = param.merge({"method" => "mm.maps.getList"})
+listbody = rest_call(api_sig(listparam, secret))
+
+STDERR.puts("fetching maps...")
+REXML::Document.new(listbody).elements.each("rsp/maps/map") { |e|
+  mid = e.attributes["id"]
+  mtitle = e.attributes["title"]
+  map = {:mid => mid, :mtitle => mtitle}
+
+  menu << map
+  mapbyid[mid] = map
+  mapbyname[mtitle.downcase] = map
+}
+
+# list ONLY
+if options[:list]
+  menu.each_with_index { |item, idx|
+    STDOUT.puts "[ #{item[:mid]} ] #{item[:mtitle]}"
+  }
+  exit
+end
+
+# no argument specified
 if ARGV.empty?
   STDERR.puts "Available MindMeister Maps"
   STDERR.puts "---"
 
-  listparam = param.merge({"method" => "mm.maps.getList"})
-  listbody = rest_call(api_sig(listparam, secret))
-
-  menu = []
-  idx = 1
-
-  REXML::Document.new(listbody).elements.each("rsp/maps/map") { |e|
-    mid = e.attributes["id"]
-    mtitle = e.attributes["title"]
-    STDERR.puts "#{idx}: #{mtitle}    [ #{mid} ]"
-    menu << mid
-    idx += 1
+  maxtitle = mapbyname.keys.max_by{ |k| k.length }.length
+  menu.each_with_index { |item, idx|
+    STDERR.puts "#{idx+1}: #{item[:mtitle]} #{" " * (maxtitle - item[:mtitle].length + 2)} [ #{item[:mid]} ]"
   }
-
+  
   sel = 0
   
   while !sel =~ /^\d+$/ || sel.to_i <= 0 || sel.to_i > menu.length
@@ -218,9 +239,17 @@ if ARGV.empty?
     sel = STDIN.gets
   end
 
-  map_id = menu[sel.to_i - 1]
+  map_id = menu[sel.to_i - 1][:mid]
 else
-  map_id = ARGV[0]
+  val = ARGV.join(" ")
+  if mapbyid.has_key?(val)
+    map_id = mapbyid[val][:mid]
+  elsif mapbyname.has_key?(val.downcase)
+    map_id = mapbyname[val.downcase][:mid]
+  else
+    STDERR.puts "Invalid Parameter: No map found."
+    exit 1
+  end
 end
 
 d = Hash.new()
