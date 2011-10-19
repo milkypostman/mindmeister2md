@@ -44,6 +44,22 @@ def api_sig (param, secret)
              Digest::MD5.hexdigest(secret + param.sort.join))
 end
 
+class Mindmap
+  attr_accessor :key, :title, :modified
+  def initialize
+    @key = nil
+    @title = nil
+    @modified = nil
+  end
+
+  def initialize(key, title, modified)
+    @key = key
+    @title = title
+    @modified = modified
+  end
+end
+  
+
 class String
   # Removes HTML tags from a string. Allows you to specify some tags to be kept.
   def strip_html( allowed = [] )    
@@ -205,19 +221,21 @@ listbody = rest_call(api_sig(listparam, secret))
 
 STDERR.puts("fetching maps...")
 REXML::Document.new(listbody).elements.each("rsp/maps/map") { |e|
-  mid = e.attributes["id"]
-  mtitle = e.attributes["title"]
-  map = {:mid => mid, :mtitle => mtitle}
-
+  map = Mindmap.new(e.attributes["id"],
+                    e.attributes["title"],
+                    e.attributes["modified"])
   menu << map
-  mapbyid[mid] = map
-  mapbyname[mtitle.downcase] = map
+  mapbyid[map.key] = map
+  mapbyname[map.title.downcase] = map
 }
+
+maxtitle = mapbyname.keys.max_by{ |k| k.length }.length
 
 # list ONLY
 if options[:list]
   menu.each_with_index { |item, idx|
-    STDOUT.puts "[ #{item[:mid]} ] #{item[:mtitle]}"
+    titlepad = " " * (maxtitle - item.title.length + 2)
+    STDOUT.puts "[ #{item.key} ] #{item.title} #{titlepad} ( #{item.modified} )"
   }
   exit
 end
@@ -227,9 +245,14 @@ if ARGV.empty?
   STDERR.puts "Available MindMeister Maps"
   STDERR.puts "---"
 
-  maxtitle = mapbyname.keys.max_by{ |k| k.length }.length
+  # how many digits to consider
+  intpad = Math::log10(menu.length).to_i+1
   menu.each_with_index { |item, idx|
-    STDERR.puts "#{idx+1}: #{item[:mtitle]} #{" " * (maxtitle - item[:mtitle].length + 2)} [ #{item[:mid]} ]"
+    titlepad = " " * (maxtitle - item.title.length + 2)
+    
+    # just makes the formatting nice
+    idxstr = "%#{intpad}d" % (idx+1)
+    STDERR.puts "#{idxstr}: #{item.title} #{titlepad} ( #{item.modified} ) [ #{item.key} ]"
   }
   
   sel = 0
@@ -239,13 +262,13 @@ if ARGV.empty?
     sel = STDIN.gets
   end
 
-  map_id = menu[sel.to_i - 1][:mid]
+  map_id = menu[sel.to_i - 1].key
 else
   val = ARGV.join(" ")
   if mapbyid.has_key?(val)
-    map_id = mapbyid[val][:mid]
+    map_id = mapbyid[val].key
   elsif mapbyname.has_key?(val.downcase)
-    map_id = mapbyname[val.downcase][:mid]
+    map_id = mapbyname[val.downcase].key
   else
     STDERR.puts "Invalid Parameter: No map found."
     exit 1
