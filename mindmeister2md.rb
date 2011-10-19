@@ -25,6 +25,12 @@ def rest_call(param)
   Net::HTTP.get_response(url).body
 end  
 
+def auth_valid? (param, secret)
+  valparam = param.merge({"method" => "mm.auth.checkToken"})
+  valbody = rest_call(api_sig(valparam, secret))
+  REXML::Document.new(valbody).elements["rsp"].attributes["stat"] == "ok"
+end
+
 def join_param (param)
   URI.escape(
   param.sort.map { |key, val|
@@ -46,7 +52,7 @@ class String
         %(<(?!(\\s|\\/)*(#{
           allowed.map {|tag| Regexp.escape( tag )}.join( "|" )
         })( |>|\\/|'|"|<|\\s*\\z))[^>]*(>+|\\s*\\z)),
-        Regexp::IGNORECASE | Regexp::MULTILINE
+        Regexp::IGNORECASE | Regexp::MULTILI
       )
     else
       /<[^>]*(>+|\s*\z)/m
@@ -84,12 +90,12 @@ def authenticate (api_key, secret)
   # next the user has to authenticate this API key
   authparam = {"api_key" => api_key, "perms" => "read", "frob" => frob}
   authurl = URI::HTTPS.build({:host => $host, :path => "/services/auth", :query => api_sig(authparam, secret)})
-  puts "Opening Safari for authentication."
-  puts authurl
+  STDERR.puts "Opening Safari for authentication."
+  STDERR.puts authurl
 
   `open -a Safari "#{authurl.to_s}"`
-  puts "Press ENTER after you have successfully authenticated."
-  gets
+  STDERR.puts "Press ENTER after you have successfully authenticated."
+  STDIN.gets
 
   # now we actually get the auth data
   authparam = {"api_key" => api_key, "method" => "mm.auth.getToken", "frob" => frob}
@@ -109,10 +115,10 @@ end
 # if the configuration file doesn't exist, create it with default values
 if !File.exists? $config_file
   dump_config( {"api_key" => "", "secret" => ""} )
-  puts "You need to update the configuration file #{$config_file}."
-  puts
-  puts "You can apply for an API key here: https://www.mindmeister.com/account/api/"
-  puts
+  STDERR.puts "You need to update the configuration file #{$config_file}."
+  STDERR.puts
+  STDERR.puts "You can apply for an API key here: https://www.mindmeister.com/account/api/"
+  STDERR.puts
   Process.exit(-1)
 end
 
@@ -121,11 +127,11 @@ config = load_config
 
 # assert we have api_key and secret
 if !config.key? "api_key" or !config.key? "secret"
-  puts "ERROR: api_key or secret not in configuration file!"
-  puts "Adding keys to configuration; please update accordingly."
-  puts
-  puts "You can apply for an API key here: https://www.mindmeister.com/account/api/"
-  puts
+  STDERR.puts "ERROR: api_key or secret not in configuration file!"
+  STDERR.puts "Adding keys to configuration; please update accordingly."
+  STDERR.puts
+  STDERR.puts "You can apply for an API key here: https://www.mindmeister.com/account/api/"
+  STDERR.puts
   if !config.key? "api_key"
     config["api_key"] = ""
   end
@@ -138,7 +144,7 @@ end
 
 # assert that api_key and secret have values
 if config["api_key"] == "" or config["secret"] == ""
-  puts "api_key or secret are missing.  Please update #{$config_file}."
+  STDERR.puts "api_key or secret are missing.  Please update #{$config_file}."
   Process.exit(-1)
 end
 
@@ -164,8 +170,13 @@ end
 
 $list_level = config["list_level"]
 
-auth = config["auth"]
-param.update({"auth_token" => auth["token"]})
+param.update({"auth_token" => config["auth"]["token"]})
+
+if !auth_valid?(param, secret)
+  config["auth"] = authenticate(config["api_key"], secret)
+  dump_config (config)
+  param.update({"auth_token" => config["auth"]["token"]})
+end
 
 options = {}
 
@@ -189,7 +200,6 @@ if ARGV.empty?
   listparam = param.merge({"method" => "mm.maps.getList"})
   listbody = rest_call(api_sig(listparam, secret))
 
-  # puts listbody
   menu = []
   idx = 1
 
@@ -257,6 +267,7 @@ def print_level (node, level=0, io=STDOUT)
   end
 end
 
+# outfile if you got em'
 io = options[:outfile].nil? ? STDOUT : File.open(options[:outfile], 'w')
 print_level(root, 0, io)
 
