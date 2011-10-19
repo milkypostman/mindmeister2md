@@ -5,6 +5,7 @@ require 'uri'
 require 'net/http'
 require 'yaml'
 require 'rexml/document'
+require 'optparse'
 
 $host = "www.mindmeister.com"
 
@@ -23,6 +24,12 @@ def rest_call(param)
   Net::HTTP.get_response(url).body
 end  
 
+def auth_valid? (param, secret)
+  valparam = param.merge({"method" => "mm.auth.checkToken"})
+  valbody = rest_call(api_sig(valparam, secret))
+  REXML::Document.new(valbody).elements["rsp"].attributes["stat"] == "ok"
+end
+
 def join_param (param)
   URI.escape(
   param.sort.map { |key, val|
@@ -36,6 +43,22 @@ def api_sig (param, secret)
              Digest::MD5.hexdigest(secret + param.sort.join))
 end
 
+class Mindmap
+  attr_accessor :key, :title, :modified
+  def initialize
+    @key = nil
+    @title = nil
+    @modified = nil
+  end
+
+  def initialize(key, title, modified)
+    @key = key
+    @title = title
+    @modified = modified
+  end
+end
+  
+
 class String
   # Removes HTML tags from a string. Allows you to specify some tags to be kept.
   def strip_html( allowed = [] )    
@@ -44,7 +67,7 @@ class String
         %(<(?!(\\s|\\/)*(#{
           allowed.map {|tag| Regexp.escape( tag )}.join( "|" )
         })( |>|\\/|'|"|<|\\s*\\z))[^>]*(>+|\\s*\\z)),
-        Regexp::IGNORECASE | Regexp::MULTILINE
+        Regexp::IGNORECASE | Regexp::MULTILI
       )
     else
       /<[^>]*(>+|\s*\z)/m
@@ -81,11 +104,13 @@ def authenticate (api_key, secret)
 
   # next the user has to authenticate this API key
   authparam = {"api_key" => api_key, "perms" => "read", "frob" => frob}
-  authurl = URI::HTTP.build({:host => $host, :path => "/services/auth", :query => api_sig(authparam, secret)})
-  puts "Opening Safari for authentication."
+  authurl = URI::HTTPS.build({:host => $host, :path => "/services/auth", :query => api_sig(authparam, secret)})
+  STDERR.puts "Opening Safari for authentication."
+  STDERR.puts authurl
+
   `open -a Safari "#{authurl.to_s}"`
-  puts "Press ENTER after you have successfully authenticated."
-  gets
+  STDERR.puts "Press ENTER after you have successfully authenticated."
+  STDIN.gets
 
   # now we actually get the auth data
   authparam = {"api_key" => api_key, "method" => "mm.auth.getToken", "frob" => frob}
@@ -105,11 +130,11 @@ end
 # if the configuration file doesn't exist, create it with default values
 if !File.exists? $config_file
   dump_config( {"api_key" => "", "secret" => ""} )
-  puts "You need to update the configuration file #{$config_file}."
-  puts
-  puts "You can apply for an API key here: https://www.mindmeister.com/account/api/"
-  puts
-  Process.exit(-1)
+  STDERR.puts "You need to update the configuration file #{$config_file}."
+  STDERR.puts
+  STDERR.puts "You can apply for an API key here: https://www.mindmeister.com/account/api/"
+  STDERR.puts
+  exit 1
 end
 
 # load our configuration file
@@ -117,11 +142,11 @@ config = load_config
 
 # assert we have api_key and secret
 if !config.key? "api_key" or !config.key? "secret"
-  puts "ERROR: api_key or secret not in configuration file!"
-  puts "Adding keys to configuration; please update accordingly."
-  puts
-  puts "You can apply for an API key here: https://www.mindmeister.com/account/api/"
-  puts
+  STDERR.puts "ERROR: api_key or secret not in configuration file!"
+  STDERR.puts "Adding keys to configuration; please update accordingly."
+  STDERR.puts
+  STDERR.puts "You can apply for an API key here: https://www.mindmeister.com/account/api/"
+  STDERR.puts
   if !config.key? "api_key"
     config["api_key"] = ""
   end
@@ -129,13 +154,13 @@ if !config.key? "api_key" or !config.key? "secret"
     config["secret"] = ""
   end
   dump_config( config )
-  Process.exit(-1)
+  exit 1
 end
 
 # assert that api_key and secret have values
 if config["api_key"] == "" or config["secret"] == ""
-  puts "api_key or secret are missing.  Please update #{$config_file}."
-  Process.exit(-1)
+  STDERR.puts "api_key or secret are missing.  Please update #{$config_file}."
+  exit 1
 end
 
 param = {"api_key" => config["api_key"]}
@@ -146,70 +171,153 @@ if !config.key? "auth"
   dump_config( config )
 end
 
-auth = config["auth"]
-param.update({"auth_token" => auth["token"]})
-
-if ARGV.empty?
-  puts "Listing MindMeister Maps"
-  puts "---"
-
-  listparam = param.merge({"method" => "mm.maps.getList"})
-  listbody = rest_call(api_sig(listparam, secret))
-
-  # puts listbody
-
-  REXML::Document.new(listbody).elements.each("rsp/maps/map") { |e|
-    mid = e.attributes["id"]
-    mtitle = e.attributes["title"]
-    puts "#{mid} : #{mtitle}"
-  }
-
-else
-  d = Hash.new()
-
-  mapparam = param.merge({"method" => "mm.maps.getMap", "map_id" => ARGV[0]})
-  mapbody = rest_call(api_sig(mapparam, secret))
-
-  root = nil
-
-  doc, posts = REXML::Document.new(mapbody)
-  doc.elements.each("rsp/ideas/idea") do |p|
-    id = p.elements["id"].text
-    title = p.elements["title"].text
-    link = p.elements["link"].text unless p.elements["link"].text.nil?
-    note = p.elements["note"].text.strip_html(['a']) unless p.elements["note"].text.nil?
-    i = Idea.new(id, title, link, note)
-    parent = p.elements["parent"].text
-    if parent.nil?
-      root = i
-    else
-      d[parent].children << i
-    end
-
-    d[id] = i
-  end
-
-  def print_level ( node, spaces)
-    title = node.title
-    title = node.link.nil? ? title : "[#{title}](#{node.link})"
-    title = (node.note.nil? || spaces == 0) ? title : "#{title}\n\n    #{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
-    title = title.gsub(/\\r?/,'')
-            .gsub(/\s?style="[^"]*?"/,'')
-            .gsub(/([#*])/,'\\\\\1')
-    if spaces == 0
-      puts "# #{title}\n"
-    elsif spaces == 1
-      puts "\n## #{title}\n\n"
-    else
-      ((spaces-2)*2).times {print " "}
-      puts "* #{title}"
-    end
-    node.children.each { |n|
-      print_level(n, spaces + 1)
-    }
-  end
-
-
-  print_level(root, 0)
-
+if !config.key? "indent"
+  config["indent"] = 2
+  dump_config( config )
 end
+
+$indent = config["indent"]
+
+if !config.key? "list_level"
+  config["list_level"] = 2
+  dump_config( config )
+end
+
+$list_level = config["list_level"]
+
+param.update({"auth_token" => config["auth"]["token"]})
+
+if !auth_valid?(param, secret)
+  config["auth"] = authenticate(config["api_key"], secret)
+  dump_config(config)
+  param.update({"auth_token" => config["auth"]["token"]})
+end
+
+options = {}
+
+optparse = OptionParser.new do |opts|
+  opts.banner = "Usage: mindmeister2md.rb [options] [mapid]"
+  opts.on("-o", "--output FILE", "Write output to FILE") do |file|
+    options[:outfile] = file
+  end
+  opts.on("-l", "--list", "List Maps and Exit") do
+    options[:list] = true
+  end
+   opts.on( '-h', '--help', 'Display this screen' ) do
+     puts opts
+     exit 1
+   end
+end
+
+optparse.parse!
+
+menu = []
+mapbyid = {}
+mapbyname = {}
+
+listparam = param.merge({"method" => "mm.maps.getList"})
+listbody = rest_call(api_sig(listparam, secret))
+
+STDERR.puts("fetching maps...")
+REXML::Document.new(listbody).elements.each("rsp/maps/map") { |e|
+  map = Mindmap.new(e.attributes["id"],
+                    e.attributes["title"],
+                    e.attributes["modified"])
+  menu << map
+  mapbyid[map.key] = map
+  mapbyname[map.title.downcase] = map
+}
+
+maxtitle = mapbyname.keys.max_by{ |k| k.length }.length
+
+# list ONLY
+if options[:list]
+  menu.each_with_index { |item, idx|
+    titlepad = " " * (maxtitle - item.title.length + 2)
+    STDOUT.puts "[ #{item.key} ] #{item.title} #{titlepad} ( #{item.modified} )"
+  }
+  exit
+end
+
+# no argument specified
+if ARGV.empty?
+  STDERR.puts "Available MindMeister Maps"
+  STDERR.puts "---"
+
+  # how many digits to consider
+  intpad = Math::log10(menu.length).to_i+1
+  menu.each_with_index { |item, idx|
+    titlepad = " " * (maxtitle - item.title.length + 2)
+    
+    # just makes the formatting nice
+    idxstr = "%#{intpad}d" % (idx+1)
+    STDERR.puts "#{idxstr}: #{item.title} #{titlepad} ( #{item.modified} ) [ #{item.key} ]"
+  }
+  
+  sel = 0
+  
+  while !sel =~ /^\d+$/ || sel.to_i <= 0 || sel.to_i > menu.length
+    STDERR.print "Selection: "
+    sel = STDIN.gets
+  end
+
+  map_id = menu[sel.to_i - 1].key
+else
+  val = ARGV.join(" ")
+  if mapbyid.has_key?(val)
+    map_id = mapbyid[val].key
+  elsif mapbyname.has_key?(val.downcase)
+    map_id = mapbyname[val.downcase].key
+  else
+    STDERR.puts "Invalid Parameter: No map found."
+    exit 1
+  end
+end
+
+d = Hash.new()
+
+mapparam = param.merge({"method" => "mm.maps.getMap", "map_id" => map_id})
+mapbody = rest_call(api_sig(mapparam, secret))
+
+root = nil
+
+doc, posts = REXML::Document.new(mapbody)
+doc.elements.each("rsp/ideas/idea") do |p|
+  id = p.elements["id"].text
+  title = p.elements["title"].text
+  link = p.elements["link"].text unless p.elements["link"].text.nil?
+  note = p.elements["note"].text.strip_html(['a']) unless p.elements["note"].text.nil?
+  i = Idea.new(id, title, link, note)
+  parent = p.elements["parent"].text
+  if parent.nil?
+    root = i
+  else
+    d[parent].children << i
+  end
+
+  d[id] = i
+end
+
+def print_level (node, level=0, io=STDOUT)
+  title = node.title
+  title = node.link.nil? ? title : "[#{title}](#{node.link})"
+  title = (node.note.nil? || spaces == 0) ? title : "#{title}\n\n    #{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
+  title = title.gsub(/\\r?/,'').gsub(/\s?style="[^"]*?"/,'').gsub(/([#*])/,'\\\\\1')
+  if level < $list_level
+    io.print "#" * (level+1)
+    io.puts " #{title}\n\n"
+  else
+    io.print " " * ((level-$list_level)*$indent)
+    io.puts "* #{title}"
+  end
+  node.children.each { |n|
+    print_level(n, level + 1, io)
+  }
+  if level <= $list_level-1
+    io.print level == $list_level - 1 ? "\n\n" : "\n"
+  end
+end
+
+# outfile if you got em'
+io = options[:outfile].nil? ? STDOUT : File.open(options[:outfile], 'w')
+print_level(root, 0, io)
