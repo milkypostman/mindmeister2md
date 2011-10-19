@@ -3,7 +3,6 @@
 require 'digest/md5'
 require 'uri'
 require 'net/http'
-require 'net/https'
 require 'yaml'
 require 'rexml/document'
 require 'optparse'
