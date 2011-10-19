@@ -67,7 +67,7 @@ class String
         %(<(?!(\\s|\\/)*(#{
           allowed.map {|tag| Regexp.escape( tag )}.join( "|" )
         })( |>|\\/|'|"|<|\\s*\\z))[^>]*(>+|\\s*\\z)),
-        Regexp::IGNORECASE | Regexp::MULTILI
+        Regexp::IGNORECASE | Regexp::MULTILINE
       )
     else
       /<[^>]*(>+|\s*\z)/m
@@ -77,21 +77,23 @@ class String
 end
 
 class Idea
-  attr_accessor :key, :title, :link, :note, :children
+  attr_accessor :key, :title, :link, :note, :image, :children
 
   def initialize
     @key = nil
     @title = nil
     @note = nil
     @link = nil
+    @image = nil
     @children = []
   end
 
-  def initialize(key, title, link, note)
+  def initialize(key, title, link, note, image)
     @key = key
     @title = title
     @link = link
     @note = note
+    @image = image
     @children = []
   end
 end
@@ -189,7 +191,7 @@ param.update({"auth_token" => config["auth"]["token"]})
 
 if !auth_valid?(param, secret)
   config["auth"] = authenticate(config["api_key"], secret)
-  dump_config (config)
+  dump_config(config)
   param.update({"auth_token" => config["auth"]["token"]})
 end
 
@@ -287,7 +289,10 @@ doc.elements.each("rsp/ideas/idea") do |p|
   title = p.elements["title"].text
   link = p.elements["link"].text unless p.elements["link"].text.nil?
   note = p.elements["note"].text.strip_html(['a']) unless p.elements["note"].text.nil?
-  i = Idea.new(id, title, link, note)
+  unless p.elements["image"].elements["url"].nil?
+    image = p.elements["image"].elements["url"].text unless p.elements["image"].elements["url"].text.nil?
+  end
+  i = Idea.new(id, title, link, note, image)
   parent = p.elements["parent"].text
   if parent.nil?
     root = i
@@ -301,8 +306,9 @@ end
 def print_level (node, level=0, io=STDOUT)
   title = node.title
   title = node.link.nil? ? title : "[#{title}](#{node.link})"
-  title = (node.note.nil? || spaces == 0) ? title : "#{title}\n\n    #{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
-  title = title.gsub(/\\r?/,'').gsub(/\s?style="[^"]*?"/,'').gsub(/([#*])/,'\\\\\1')
+  title = (node.note.nil?) ? title : "#{title}\n\n    #{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
+  title = node.image.nil? ? title : "#{title}\n\n![](#{node.image})\n\n"
+  title = title.gsub(/\\r/,' ').gsub(/\\'/,"'").gsub(/\s?style="[^"]*?"/,'').gsub(/([#*])/,'\\\\\1')
   if level < $list_level
     io.print "#" * (level+1)
     io.puts " #{title}\n\n"
@@ -321,4 +327,3 @@ end
 # outfile if you got em'
 io = options[:outfile].nil? ? STDOUT : File.open(options[:outfile], 'w')
 print_level(root, 0, io)
-
