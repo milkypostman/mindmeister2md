@@ -5,6 +5,7 @@ require 'uri'
 require 'net/http'
 require 'yaml'
 require 'rexml/document'
+require 'optparse'
 
 $host = "www.mindmeister.com"
 
@@ -163,6 +164,21 @@ $list_level = config["list_level"]
 auth = config["auth"]
 param.update({"auth_token" => auth["token"]})
 
+options = {}
+
+optparse = OptionParser.new do |opts|
+  opts.banner = "Usage: mindmeister2md.rb [options] [mapid]"
+  opts.on("-o", "--output FILE", "Write output to FILE") do |file|
+    options[:outfile] = file
+  end
+   opts.on( '-h', '--help', 'Display this screen' ) do
+     puts opts
+     exit
+   end
+end
+
+optparse.parse!
+
 if ARGV.empty?
   puts "Listing MindMeister Maps"
   puts "---"
@@ -203,26 +219,27 @@ else
     d[id] = i
   end
 
-  def print_level (node, level)
+  def print_level (node, level=0, io=STDOUT)
     title = node.title
     title = node.link.nil? ? title : "[#{title}](#{node.link})"
     title = (node.note.nil? || spaces == 0) ? title : "#{title}\n\n    #{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
     title = title.gsub(/\\r?/,'').gsub(/\s?style="[^"]*?"/,'').gsub(/([#*])/,'\\\\\1')
     if level < $list_level
-      print "#" * (level+1)
-      puts " #{title}\n\n"
+      io.print "#" * (level+1)
+      io.puts " #{title}\n\n"
     else
-      print " " * ((level-$list_level)*$indent)
-      puts "* #{title}"
+      io.print " " * ((level-$list_level)*$indent)
+      io.puts "* #{title}"
     end
     node.children.each { |n|
-      print_level(n, level + 1)
+      print_level(n, level + 1, io)
     }
     if level <= $list_level-1
-      print level == $list_level - 1 ? "\n\n" : "\n"
+      io.print level == $list_level - 1 ? "\n\n" : "\n"
     end
   end
 
-  print_level(root, 0)
+  io = options[:outfile].nil? ? STDOUT : File.open(options[:outfile], 'w')
+  print_level(root, 0, io)
 
 end
