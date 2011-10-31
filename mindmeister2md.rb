@@ -174,7 +174,7 @@ if !config.key? "auth"
 end
 
 if !config.key? "indent"
-  config["indent"] = 2
+  config["indent"] = 4
   dump_config( config )
 end
 
@@ -304,7 +304,7 @@ doc.elements.each("rsp/ideas/idea") do |p|
 end
 
 def print_level (node, level=0, io=STDOUT)
-  title = node.title
+  title = node.title.gsub(/\\n/," ")
   title = node.link.nil? ? title : "[#{title}](#{node.link})"
   title = (node.note.nil?) ? title : "#{title}\n\n    #{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
   title = node.image.nil? ? title : "#{title}\n\n![](#{node.image})\n\n"
