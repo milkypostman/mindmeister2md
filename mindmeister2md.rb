@@ -160,7 +160,7 @@ if !config.key? "api_key" or !config.key? "secret"
 end
 
 # assert that api_key and secret have values
-if not config["api_key"]  or not config["secret"] == ""
+if not config["api_key"]  or not config["secret"]
   STDERR.puts "api_key or secret are missing.  Please update #{$config_file}."
   exit 1
 end
