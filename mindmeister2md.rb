@@ -32,9 +32,9 @@ end
 
 def join_param (param)
   URI.escape(
-  param.sort.map { |key, val|
-    "#{key}=#{val}"
-  }.join("&"))
+             param.sort.map { |key, val|
+               "#{key}=#{val}"
+             }.join("&"))
 end
 
 def api_sig (param, secret)
@@ -57,21 +57,21 @@ class Mindmap
     @modified = modified
   end
 end
-  
+
 
 class String
   # Removes HTML tags from a string. Allows you to specify some tags to be kept.
   def strip_html( allowed = [] )    
     re = if allowed.any?
-      Regexp.new(
-        %(<(?!(\\s|\\/)*(#{
+           Regexp.new(
+                      %(<(?!(\\s|\\/)*(#{
           allowed.map {|tag| Regexp.escape( tag )}.join( "|" )
         })( |>|\\/|'|"|<|\\s*\\z))[^>]*(>+|\\s*\\z)),
-        Regexp::IGNORECASE | Regexp::MULTILINE
-      )
-    else
-      /<[^>]*(>+|\s*\z)/m
-    end
+                      Regexp::IGNORECASE | Regexp::MULTILINE
+                      )
+         else
+           /<[^>]*(>+|\s*\z)/m
+         end
     gsub(re,'')
   end
 end
@@ -131,7 +131,7 @@ end
 
 # if the configuration file doesn't exist, create it with default values
 if !File.exists? $config_file
-  dump_config( {"api_key" => "", "secret" => ""} )
+  dump_config( {"api_key" => nil, "secret" => nil, "list_level" => 2, "indent" => 4 } )
   STDERR.puts "You need to update the configuration file #{$config_file}."
   STDERR.puts
   STDERR.puts "You can apply for an API key here: https://www.mindmeister.com/account/api/"
@@ -160,7 +160,7 @@ if !config.key? "api_key" or !config.key? "secret"
 end
 
 # assert that api_key and secret have values
-if config["api_key"] == "" or config["secret"] == ""
+if not config["api_key"]  or not config["secret"] == ""
   STDERR.puts "api_key or secret are missing.  Please update #{$config_file}."
   exit 1
 end
@@ -205,10 +205,10 @@ optparse = OptionParser.new do |opts|
   opts.on("-l", "--list", "List Maps and Exit") do
     options[:list] = true
   end
-   opts.on( '-h', '--help', 'Display this screen' ) do
-     puts opts
-     exit 1
-   end
+  opts.on( '-h', '--help', 'Display this screen' ) do
+    puts opts
+    exit 1
+  end
 end
 
 optparse.parse!
