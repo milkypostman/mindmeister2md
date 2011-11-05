@@ -198,12 +198,18 @@ end
 options = {}
 
 optparse = OptionParser.new do |opts|
-  opts.banner = "Usage: mindmeister2md.rb [options] [mapid]"
+  opts.banner = "Usage: mindmeister2md.rb [options] <map id | map name>"
   opts.on("-o", "--output FILE", "Write output to FILE") do |file|
     options[:outfile] = file
   end
   opts.on("-l", "--list", "List Maps and Exit") do
     options[:list] = true
+  end
+  opts.on("-i", "--indent <indent>", "Number of spaces for each indent level") do |indent|
+    $indent = indent.to_i
+  end
+  opts.on("-s", "--listlevel <list_level>", "Level at which lists should start") do |listlevel|
+    $list_level = listlevel.to_i
   end
   opts.on( '-h', '--help', 'Display this screen' ) do
     puts opts
