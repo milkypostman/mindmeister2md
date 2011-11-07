@@ -34,7 +34,7 @@ Optionally you can pass either the name of a map (case insensitive) or the map i
 
 By default the script outputs the markdown to the screen. There is an optional command-line argument (`-o`) which will write the markdown to a file.
 
-For the UNIX geeks: All extraneous output from the script is sent to standard out (`STDOUT`) so you can pipe the actual markdown output to another script.
+For the UNIX geeks: Only the generate markdown is sent to standard output (`STDOUT`).  For Mac users this means the ability to copy the markdown to the copy buffer:
 
 		./mindmeister2md.rb my first ipad map | wc -l
 
@@ -50,13 +50,14 @@ By default the configuration file looks similar to this:
 	   api_key: 
 	   secret: 
 
-You get both `api_key` and `secret` from the [MindMeister api request page][mmapi]. There a few other options you can specify.
+You get both `api_key` and `secret` from the [MindMeister api request page][mmapi]. The other two options you can set are:
 
 `list_level`
 : The level in the map where lists should begin. At a `list_level` of 2, the first two levels of the map tree structure are represented as markdown headings, rather than as lists. A `list_level` of 0 will mean that the map will be exported as a single giant list.
 
 `indent`
 : specifies the number of spaces that represent a single indent in the list.
+
 
 ## Command Line Options
 
