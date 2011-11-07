@@ -1,4 +1,12 @@
 #!/usr/bin/env ruby
+#--
+# mindmeister2md.rb -- Convert MindMeister maps to Markdown
+# 
+# Copyright (c) 2011 Donald Ephraim Curtis <dcurtis@milkbox.net>
+# Copyright (c) 2011 Brett Terpstra
+#
+#++
+
 
 require 'digest/md5'
 require 'uri'
