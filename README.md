@@ -34,7 +34,7 @@ Optionally you can pass either the name of a map (case insensitive) or the map i
 
 By default the script outputs the markdown to the screen. There is an optional command-line argument (`-o`) which will write the markdown to a file.
 
-For the UNIX geeks: Only the generate markdown is sent to standard output (`STDOUT`).  For Mac users this means the ability to copy the markdown to the copy buffer:
+For the UNIX geeks: Only the generate markdown is sent to standard output (`STDOUT`).  So the markdown can easily be piped to other commands,
 
 		./mindmeister2md.rb my first ipad map | wc -l
 
