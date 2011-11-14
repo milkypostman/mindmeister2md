@@ -332,10 +332,14 @@ doc.elements.each("rsp/ideas/idea") do |p|
 end
 
 def print_level (node, level=0, io=STDOUT)
+  subindent = " " * $indent
+  if level >= $list_level
+    subindent += " " * ((level-$list_level)*$indent)
+  end
   title = node.title.gsub(/\\n/," ")
   title = node.link.nil? ? title : "[#{title}](#{node.link})"
-  title = (node.note.nil?) ? title : "#{title}\n\n    #{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
-  title = node.image.nil? ? title : "#{title}\n\n![](#{node.image})\n\n"
+  title = (node.note.nil?) ? title : "#{title}\n\n#{subindent}#{node.note.gsub(/\s?style="[^"]*?"/,'')}\n\n"
+  title = node.image.nil? ? title : "#{title}\n\n#{subindent}![](#{node.image})\n\n"
   title = title.gsub(/\\r/,' ').gsub(/\\'/,"'").gsub(/\s?style="[^"]*?"/,'').gsub(/([#*])/,'\\\\\1')
   if level < $list_level
     io.print "#" * (level+1)
