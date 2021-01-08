@@ -80,7 +80,7 @@ Most of the configuration file can also be changed at run-time using optional co
 `-h, --help` 
 : Print command-line argument help.
 
-[mmapi]: https://www.mindmeister.com/account/api/
+[mmapi]: https://www.mindmeister.com/api/
 [mindmeister]: http://www.mindmeister.com/
 [md]: http://daringfireball.net/projects/markdown/
 [ruby]: http://www.ruby-lang.org/en/
