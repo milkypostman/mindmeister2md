@@ -49,11 +49,15 @@ By default the configuration file looks similar to this:
 	   list_level: 2
 	   api_key: 
 	   secret: 
+	   list_bullet: *
 
 You get both `api_key` and `secret` from the [MindMeister api request page][mmapi]. The other two options you can set are:
 
 `list_level`
 : The level in the map where lists should begin. At a `list_level` of 2, the first two levels of the map tree structure are represented as markdown headings, rather than as lists. A `list_level` of 0 will mean that the map will be exported as a single giant list.
+
+`list_bullet`
+: The character to use as the leading bullet in lists. Default is *, but "-" is commonly used in Markdown as well.
 
 `indent`
 : specifies the number of spaces that represent a single indent in the list.
@@ -70,6 +74,9 @@ Most of the configuration file can also be changed at run-time using optional co
 
 `-i, --indent <indent>` 
 : Set number of spaces for each indent level. Like temporarily setting `indent` in the configuration file.
+
+`-b, --bullet "<indent>"` 
+: Select the character to use as the list bullet. Like temporarily setting `list_bullet` in the configuration file.
 
 `-s, --listlevel <list_level>` 
 : Set the level at which lists should start. Like temporarily setting `list_level` in the configuration file.

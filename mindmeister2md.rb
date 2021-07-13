@@ -209,6 +209,13 @@ end
 
 $list_level = config["list_level"]
 
+if !config.key? "list_bullet"
+  config["list_bullet"] = '*'
+  dump_config( config )
+end
+
+$list_bullet = config['list_bullet']
+
 param.update({"auth_token" => config["auth"]["token"]})
 
 if !auth_valid?(param, secret)
@@ -233,6 +240,9 @@ optparse = OptionParser.new do |opts|
   opts.on("-s", "--listlevel <list_level>", "Level at which lists should start") do |listlevel|
     $list_level = listlevel.to_i
   end
+  opts.on("-b", "--bullet <bullet>", "Character to use as the list bullet") do |bullet|
+    $list_bullet = bullet
+  end  
   opts.on( '-h', '--help', 'Display this screen' ) do
     puts opts
     exit 1
@@ -343,7 +353,7 @@ def print_level (node, level=0, io=STDOUT)
     io.puts " #{title}\n\n"
   else
     io.print " " * ((level-$list_level)*$indent)
-    io.puts "* #{title}"
+    io.puts "#{$list_bullet} #{title}"
   end
   node.children.each { |n|
     print_level(n, level + 1, io)
