@@ -42,7 +42,7 @@ def dump_config (config)
 end
 
 def rest_call(param)
-  url = URI::HTTP.build({:host => $host, :path => "/services/rest", :query => param})
+  url = URI::HTTPS.build({:host => $host, :path => "/services/rest", :query => param})
   Net::HTTP.get_response(url).body
 end  
 
